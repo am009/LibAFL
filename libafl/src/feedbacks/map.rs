@@ -4,6 +4,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use xxhash_rust::xxh3::xxh3_64;
 #[rustversion::nightly]
 use core::simd::SimdOrd;
 use core::{
@@ -24,7 +25,7 @@ use crate::{
     inputs::UsesInput,
     monitors::UserStats,
     observers::{MapObserver, Observer, ObserversTuple, UsesObserver},
-    state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata},
+    state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata, HasteMode},
     Error,
 };
 
@@ -418,6 +419,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
+        assert!(false, "not haste mode!");
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
 
@@ -434,6 +436,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
+        assert!(false, "not haste mode!");
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
 
@@ -496,7 +499,7 @@ impl<O, S> Feedback<S> for MapFeedback<DifferentIsNovel, O, MaxReducer, S, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
     for<'it> O: AsIter<'it, Item = u8>,
-    S: UsesInput + HasNamedMetadata + HasClientPerfMonitor + Debug,
+    S: UsesInput + HasNamedMetadata + HasClientPerfMonitor + Debug + HasteMode,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
@@ -519,6 +522,26 @@ where
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.observer_name).unwrap();
 
+        // haste mode: if we have seen this map before, count and skip it
+        let map = observer.as_slice();
+        let haste_mode = state.haste_mode();
+        if haste_mode > 0 {
+            let hash_64: u64 = xxh3_64(map);
+            let hash: usize = (((hash_64 >> 32) ^ (hash_64)) & 0x3FFFFFFF) as usize;
+            let buf: &mut Option<alloc::boxed::Box<[u8]>> = state.haste_records_map();
+            let status: u8 = buf.as_ref().unwrap()[hash];
+            // saturated add
+            if status < u8::MAX {
+                buf.as_mut().unwrap()[hash] = status + 1;
+            }
+            if status != 0 {
+                return Ok(false);
+            }
+            if haste_mode >= 2 {
+                assert!(false, "hast mode 2 not implemented!");
+            }
+        }
+
         let map_state = state
             .named_metadata_map_mut()
             .get_mut::<MapFeedbackMetadata<u8>>(&self.name)
@@ -529,7 +552,6 @@ where
             map_state.history_map.resize(len, u8::default());
         }
 
-        let map = observer.as_slice();
         debug_assert!(map.len() >= size);
 
         let history_map = map_state.history_map.as_slice();
@@ -765,6 +787,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
+        assert!(false, "not haste mode!");
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.observer_name).unwrap();

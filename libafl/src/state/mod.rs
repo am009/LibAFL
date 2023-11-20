@@ -13,6 +13,7 @@ use std::{
     vec::Vec,
 };
 
+use alloc::{string::String, boxed::Box};
 use libafl_bolts::{
     rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
@@ -237,6 +238,18 @@ pub trait HasLastReportTime {
     fn last_report_time_mut(&mut self) -> &mut Option<Duration>;
 }
 
+/// Trait for haste mode.
+pub trait HasteMode {
+    /// The haste mode status. 0: off, 1: on, 2: on with sanitized binary.
+    fn haste_mode(&self) -> u8;
+
+    /// The path to the sanitized binary.
+    fn haste_mode_binary(&self) -> &String;
+
+    /// haste mode map buffer
+    fn haste_records_map(&mut self) -> &mut Option<Box<[u8]>>;
+}
+
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "
@@ -276,6 +289,9 @@ pub struct StdState<I, C, R, SC> {
     /// This information is used by fuzzer `maybe_report_progress`.
     last_report_time: Option<Duration>,
     phantom: PhantomData<I>,
+    haste_mode: u8,
+    haste_mode_binary: String,
+    hastemode_records_map: Option<Box<[u8]>>
 }
 
 impl<I, C, R, SC> UsesInput for StdState<I, C, R, SC>
@@ -850,10 +866,50 @@ where
             dont_reenter: None,
             last_report_time: None,
             phantom: PhantomData,
+            haste_mode: 0,
+            haste_mode_binary: String::from("0"),
+            hastemode_records_map: None,
         };
         feedback.init_state(&mut state)?;
         objective.init_state(&mut state)?;
         Ok(state)
+    }
+}
+
+impl<C, I, R, SC> StdState<I, C, R, SC>
+{
+    /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
+    pub fn haste_init(
+        &mut self,
+        haste_mode_binary: String
+    ) -> ()
+    {
+        if haste_mode_binary == "0" {
+            return ();
+        }
+        if haste_mode_binary == "-" || haste_mode_binary == "1" {
+            self.haste_mode = 1;
+        } else {
+            self.haste_mode_binary = haste_mode_binary;
+            self.haste_mode = 2;
+        }
+        log::info!("Allocating haste recording map (1GB)");
+        self.hastemode_records_map = Some(vec![0; 1024 * 1024 * 1024].into_boxed_slice());
+        log::warn!("haste_mode initialized!");
+    }
+}
+
+impl<C, I, R, SC> HasteMode for StdState<I, C, R, SC> {
+    fn haste_mode(&self) -> u8 {
+        self.haste_mode
+    }
+
+    fn haste_mode_binary(&self) -> &String {
+        &self.haste_mode_binary
+    }
+
+    fn haste_records_map(&mut self) -> &mut Option<Box<[u8]>> {
+        &mut self.hastemode_records_map
     }
 }
 

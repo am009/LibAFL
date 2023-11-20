@@ -98,6 +98,13 @@ pub extern "C" fn libafl_main() {
                 .help("Timeout for each individual execution, in milliseconds")
                 .default_value("1200"),
         )
+        .arg(
+            Arg::new("haste")
+                .short('u')
+                .long("haste")
+                .help("haste_mode biary")
+                .default_value("-"),
+        )
         .arg(Arg::new("remaining"))
         .try_get_matches()
     {
@@ -166,7 +173,8 @@ pub extern "C" fn libafl_main() {
             .expect("Could not parse timeout in milliseconds"),
     );
 
-    fuzz(out_dir, crashes, &in_dir, tokens, &logfile, timeout)
+    let haste_bin = res.get_one::<String>("haste").unwrap().to_string();
+    fuzz(out_dir, crashes, &in_dir, tokens, &logfile, timeout, haste_bin)
         .expect("An error occurred while fuzzing");
 }
 
@@ -202,6 +210,7 @@ fn fuzz(
     tokenfile: Option<PathBuf>,
     logfile: &PathBuf,
     timeout: Duration,
+    haste_mode_binary: String,
 ) -> Result<(), Error> {
     let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
 
@@ -283,6 +292,7 @@ fn fuzz(
         )
         .unwrap()
     });
+    state.haste_init(haste_mode_binary);
 
     println!("Let's fuzz :)");
 
@@ -379,6 +389,7 @@ fn fuzz(
                 process::exit(0);
             });
         println!("We imported {} inputs from disk.", state.corpus().count());
+        assert!(state.corpus().count() > 0, "No entries in corpus!");
     }
 
     // Remove target ouput (logs still survive)
