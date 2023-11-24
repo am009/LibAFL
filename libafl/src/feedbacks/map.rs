@@ -529,14 +529,15 @@ where
             let hash_64: u64 = xxh3_64(map);
             let hash: usize = (((hash_64 >> 32) ^ (hash_64)) & 0x3FFFFFFF) as usize;
             let buf: &mut Option<alloc::boxed::Box<[u8]>> = state.haste_records_map();
-            let status: u8 = buf.as_ref().unwrap()[hash];
-            // saturated add
-            if status < u8::MAX {
-                buf.as_mut().unwrap()[hash] = status + 1;
-            }
+            // hash-th bit of buf is set if we have seen this map before
+            let ith = hash % 8;
+            let data_byte = buf.as_ref().unwrap()[hash / 8];
+            let status: u8 = data_byte & (1 << ith);
             if status != 0 {
                 return Ok(false);
             }
+            // not seen, set to 1.
+            buf.as_mut().unwrap()[hash / 8] = data_byte | (1 << ith);
             if haste_mode >= 2 {
                 assert!(false, "hast mode 2 not implemented!");
             }

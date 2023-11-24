@@ -893,8 +893,8 @@ impl<C, I, R, SC> StdState<I, C, R, SC>
             self.haste_mode_binary = haste_mode_binary;
             self.haste_mode = 2;
         }
-        log::info!("Allocating haste recording map (1GB)");
-        self.hastemode_records_map = Some(vec![0; 1024 * 1024 * 1024].into_boxed_slice());
+        log::info!("Allocating haste recording map (1GB / 8 = 128M)");
+        self.hastemode_records_map = Some(vec![0; 128 * 1024 * 1024].into_boxed_slice());
         log::warn!("haste_mode initialized!");
     }
 }
