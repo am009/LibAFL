@@ -16,8 +16,10 @@ pub fn main() {
 
         dir.pop();
 
-        // Try to fix build for ffmpeg.
-        args.push("-fno-sanitize-address-use-odr-indicator".into());
+        // // fix build for harfbuzz_hb-shape-fuzzer_17863b
+        // args.push("-Wno-cast-function-type-strict".into());
+        // // Try to fix build for ffmpeg.
+        // args.push("-fno-sanitize-address-use-odr-indicator".into());
         // Must be always present, even without --libafl
         args.push("-fsanitize-coverage=trace-pc-guard,trace-cmp".into());
 
