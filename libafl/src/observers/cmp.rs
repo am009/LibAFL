@@ -114,6 +114,44 @@ impl CmpValuesMetadata {
     }
 }
 
+
+pub fn all_same_bytes(mut word: u32) -> bool {
+    let byte1: u8 = (word & 0xff) as u8;
+    word = word >> 8;
+    while word > 0 {
+        let byte2: u8 = (word & 0xff) as u8;
+        if byte1 != byte2 {
+            return false;
+        }
+        word = word >> 8;
+    }
+    return true;
+}
+
+pub fn all_same_bytes8(mut word: u64) -> bool {
+    let byte1: u8 = (word & 0xff) as u8;
+    word = word >> 8;
+    while word > 0 {
+        let byte2: u8 = (word & 0xff) as u8;
+        if byte1 != byte2 {
+            return false;
+        }
+        word = word >> 8;
+    }
+    return true;
+}
+
+pub fn all_same_bytes_vec(word: &Vec<u8>) -> bool {
+    let byte1: u8 = word[0];
+    for i in 1..word.len() {
+        let byte2: u8 = word[i];
+        if byte1 != byte2 {
+            return false;
+        }
+    }
+    return true;
+}
+
 impl<'a, CM> CmpObserverMetadata<'a, CM> for CmpValuesMetadata
 where
     CM: CmpMap,
@@ -130,7 +168,7 @@ where
         let count = usable_count;
         for i in 0..count {
             let execs = cmp_map.usable_executions_for(i);
-            if execs > 0 {
+            if execs > 0 { // for each cmp entry
                 // Recongize loops and discard if needed
                 if execs > 4 {
                     let mut increasing_v0 = 0;
@@ -167,11 +205,30 @@ where
                         || decreasing_v0 >= execs - 2
                         || decreasing_v1 >= execs - 2
                     {
-                        continue;
+                        continue; // skip this cmp
                     }
                 }
                 for j in 0..execs {
                     if let Some(val) = cmp_map.values_of(i, j) {
+                        match &val {
+                            // skip zero?
+                            CmpValues::U8(_) | CmpValues::U16(_) => {}
+                            CmpValues::U32(v) => {
+                                if all_same_bytes(v.0) || all_same_bytes(v.1) {
+                                    continue;
+                                }
+                            }
+                            CmpValues::U64(v) => {
+                                if all_same_bytes8(v.0) || all_same_bytes8(v.1) {
+                                    continue;
+                                }
+                            }
+                            CmpValues::Bytes(v) => {
+                                if all_same_bytes_vec(&v.0) || all_same_bytes_vec(&v.1) {
+                                    continue;
+                                }
+                            }
+                        }
                         self.list.push(val);
                     }
                 }
