@@ -26,7 +26,7 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
-        StdMOptMutator, StdScheduledMutator, Tokens, MaskRestoreMutator,
+        StdMOptMutator, Tokens, MaskRestoreMutator, I2SScheduledMutator,
     },
     observers::{HitcountsMapObserver, TimeObserver},
     schedulers::{
@@ -58,6 +58,8 @@ use nix::{self, unistd::dup};
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
 pub extern "C" fn libafl_main() {
+    // env_logger::init();
+    // eprintln!("My pid is {}, args: {:?}", process::id(), std::env::args());
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }
@@ -304,7 +306,7 @@ fn fuzz(
     }
 
     // Setup a randomic Input2State stage
-    let i2s = I2SMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+    let i2s = I2SMutationalStage::new(I2SScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
     // Setup a MOPT mutator
     let mutator = StdMOptMutator::new(
@@ -396,8 +398,8 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
         if !std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_ok() {
+            dup2(null_fd, io::stdout().as_raw_fd())?;
             dup2(null_fd, io::stderr().as_raw_fd())?;
         }
     }

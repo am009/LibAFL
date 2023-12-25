@@ -29,7 +29,7 @@ use crate::{
         MutationResult, Mutator, MutatorsTuple,
     },
     state::{HasCorpus, HasMetadata, HasRand},
-    Error,
+    Error, observers::CmpValuesMetadata,
 };
 
 /// The metadata placed in a [`crate::corpus::Testcase`] by a [`LoggerScheduledMutator`].
@@ -111,6 +111,135 @@ where
             }
         }
         Ok(r)
+    }
+}
+
+/// A [`Mutator`] that schedules mutations with a cap for cmp values.
+pub struct I2SScheduledMutator<I, MT, S>
+where
+    MT: MutatorsTuple<I, S>,
+    S: HasRand + HasMetadata,
+{
+    name: String,
+    mutations: MT,
+    max_stack_pow: u64,
+    phantom: PhantomData<(I, S)>,
+}
+
+impl<I, MT, S> Debug for I2SScheduledMutator<I, MT, S>
+where
+    MT: MutatorsTuple<I, S>,
+    S: HasRand + HasMetadata,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "I2SScheduledMutator with {} mutations for Input type {}",
+            self.mutations.len(),
+            core::any::type_name::<I>()
+        )
+    }
+}
+
+impl<I, MT, S> Named for I2SScheduledMutator<I, MT, S>
+where
+    MT: MutatorsTuple<I, S>,
+    S: HasRand + HasMetadata,
+{
+    fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl<I, MT, S> Mutator<I, S> for I2SScheduledMutator<I, MT, S>
+where
+    MT: MutatorsTuple<I, S>,
+    S: HasRand + HasMetadata,
+{
+    #[inline]
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        self.scheduled_mutate(state, input, stage_idx)
+    }
+
+    #[inline]
+    fn post_exec_diff(
+        &mut self,
+        state: &mut S,
+        current_id: Option<CorpusId>,
+        parent_id: CorpusId,
+    ) -> Result<(), Error> {
+        self.mutations_mut().post_exec_diff_all(state, current_id, parent_id)
+    }
+}
+
+impl<I, MT, S> ComposedByMutations<I, MT, S> for I2SScheduledMutator<I, MT, S>
+where
+    MT: MutatorsTuple<I, S>,
+    S: HasRand + HasMetadata,
+{
+    /// Get the mutations
+    #[inline]
+    fn mutations(&self) -> &MT {
+        &self.mutations
+    }
+
+    // Get the mutations (mutable)
+    #[inline]
+    fn mutations_mut(&mut self) -> &mut MT {
+        &mut self.mutations
+    }
+}
+
+impl<I, MT, S> ScheduledMutator<I, MT, S> for I2SScheduledMutator<I, MT, S>
+where
+    MT: MutatorsTuple<I, S>,
+    S: HasRand + HasMetadata,
+{
+    /// Compute the number of iterations used to apply stacked mutations
+    fn iterations(&self, state: &mut S, _: &I) -> u64 {
+        let cmps_len = if let Some(meta) = state.metadata_map().get::<CmpValuesMetadata>() {
+            meta.list.len()
+        } else {
+            0
+        };
+        (cmps_len as u64 * 2).min(1 << (1 + state.rand_mut().below(self.max_stack_pow)))
+    }
+
+    /// Get the next mutation to apply
+    fn schedule(&self, state: &mut S, _: &I) -> MutationId {
+        debug_assert!(!self.mutations().is_empty());
+        state.rand_mut().below(self.mutations().len() as u64).into()
+    }
+}
+
+impl<I, MT, S> I2SScheduledMutator<I, MT, S>
+where
+    MT: MutatorsTuple<I, S>,
+    S: HasRand + HasMetadata,
+{
+    /// Create a new [`I2SScheduledMutator`] instance specifying mutations
+    pub fn new(mutations: MT) -> Self {
+        I2SScheduledMutator {
+            name: format!("I2SScheduledMutator[{}]", mutations.names().join(", ")),
+            mutations,
+            max_stack_pow: 7,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Create a new [`I2SScheduledMutator`] instance specifying mutations and the maximun number of iterations
+    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: u64) -> Self {
+        I2SScheduledMutator {
+            name: format!("I2SScheduledMutator[{}]", mutations.names().join(", ")),
+            mutations,
+            max_stack_pow,
+            phantom: PhantomData,
+        }
     }
 }
 
