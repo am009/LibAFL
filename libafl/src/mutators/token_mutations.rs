@@ -1,6 +1,6 @@
 //! Tokens are what AFL calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
-use alloc::vec::Vec;
+use alloc::{vec::Vec, collections::BTreeSet};
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use core::slice::from_raw_parts;
 use core::{
@@ -448,6 +448,12 @@ pub struct TokenMaskVec {
     data: Vec<TokenMask>,
 }
 
+/// an index set
+#[derive(Debug, Serialize, Deserialize, SerdeAny)]
+pub struct TokenMaskSet {
+    data: BTreeSet<usize>,
+}
+
 /// A `MaskRestoreMutator` [`Mutator`] restores the masked bytes from original input.
 /// It needs a valid [`TokenMaskVec`] in the testcase.
 #[derive(Debug, Default)]
@@ -609,6 +615,11 @@ where
         if let Some(gm) = global_metadata {
             gm.data.clear();
         }
+        // clear set
+        let tms = state.metadata_map_mut().get_mut::<TokenMaskSet>();
+        if let Some(ms) = tms {
+            ms.data.clear();
+        }
         Ok(())
     }
 
@@ -642,6 +653,12 @@ where
 
         let mm: &mut libafl_bolts::prelude::SerdeAnyMap = state.metadata_map_mut();
         let mut masks = Vec::new();
+        let index_set_ = mm.get::<TokenMaskSet>();
+        if index_set_.is_none() {
+            mm.insert(TokenMaskSet{data: BTreeSet::new()});
+        }
+        let index_set = mm.get_mut::<TokenMaskSet>().unwrap() as *mut TokenMaskSet;
+
         let meta = mm.get::<CmpValuesMetadata>().unwrap();
 
         let cmp_values = &meta.list[idx];
@@ -664,6 +681,11 @@ where
             CmpValues::U16(v) => {
                 if len >= size_of::<u16>() {
                     for i in off..len - (size_of::<u16>() - 1) {
+                        unsafe {
+                            if (*index_set).data.contains(&i) {
+                                continue;
+                            }
+                        }
                         let val =
                             u16::from_ne_bytes(bytes[i..i + size_of::<u16>()].try_into().unwrap());
                         if val == v.0 {
@@ -693,6 +715,11 @@ where
             CmpValues::U32(v) => {
                 if len >= size_of::<u32>() {
                     for i in off..len - (size_of::<u32>() - 1) {
+                        unsafe {
+                            if (*index_set).data.contains(&i) {
+                                continue;
+                            }
+                        }
                         let val =
                             u32::from_ne_bytes(bytes[i..i + size_of::<u32>()].try_into().unwrap());
                         if val == v.0 {
@@ -700,24 +727,36 @@ where
                             bytes[i..i + size_of::<u32>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
                             masks.push(TokenMask{left: i, right: i + size_of::<u32>()});
+                            unsafe {
+                                (*index_set).data.insert(i);
+                            }
                             break;
                         } else if val.swap_bytes() == v.0 {
                             let new_bytes = v.1.swap_bytes().to_ne_bytes();
                             bytes[i..i + size_of::<u32>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
                             masks.push(TokenMask{left: i, right: i + size_of::<u32>()});
+                            unsafe {
+                                (*index_set).data.insert(i);
+                            }
                             break;
                         } else if val == v.1 {
                             let new_bytes = v.0.to_ne_bytes();
                             bytes[i..i + size_of::<u32>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
                             masks.push(TokenMask{left: i, right: i + size_of::<u32>()});
+                            unsafe {
+                                (*index_set).data.insert(i);
+                            }
                             break;
                         } else if val.swap_bytes() == v.1 {
                             let new_bytes = v.0.swap_bytes().to_ne_bytes();
                             bytes[i..i + size_of::<u32>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
                             masks.push(TokenMask{left: i, right: i + size_of::<u32>()});
+                            unsafe {
+                                (*index_set).data.insert(i);
+                            }
                             break;
                         }
                     }
@@ -726,6 +765,11 @@ where
             CmpValues::U64(v) => {
                 if len >= size_of::<u64>() {
                     for i in off..len - (size_of::<u64>() - 1) {
+                        unsafe {
+                            if (*index_set).data.contains(&i) {
+                                continue;
+                            }
+                        }
                         let val =
                             u64::from_ne_bytes(bytes[i..i + size_of::<u64>()].try_into().unwrap());
                         if val == v.0 {
@@ -733,24 +777,36 @@ where
                             bytes[i..i + size_of::<u64>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
                             masks.push(TokenMask{left: i, right: i + size_of::<u64>()});
+                            unsafe {
+                                (*index_set).data.insert(i);
+                            }
                             break;
                         } else if val.swap_bytes() == v.0 {
                             let new_bytes = v.1.swap_bytes().to_ne_bytes();
                             bytes[i..i + size_of::<u64>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
                             masks.push(TokenMask{left: i, right: i + size_of::<u64>()});
+                            unsafe {
+                                (*index_set).data.insert(i);
+                            }
                             break;
                         } else if val == v.1 {
                             let new_bytes = v.0.to_ne_bytes();
                             bytes[i..i + size_of::<u64>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
                             masks.push(TokenMask{left: i, right: i + size_of::<u64>()});
+                            unsafe {
+                                (*index_set).data.insert(i);
+                            }
                             break;
                         } else if val.swap_bytes() == v.1 {
                             let new_bytes = v.0.swap_bytes().to_ne_bytes();
                             bytes[i..i + size_of::<u64>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
                             masks.push(TokenMask{left: i, right: i + size_of::<u64>()});
+                            unsafe {
+                                (*index_set).data.insert(i);
+                            }
                             break;
                         }
                     }
@@ -758,6 +814,11 @@ where
             }
             CmpValues::Bytes(v) => {
                 'outer: for i in off..len {
+                    unsafe {
+                        if (*index_set).data.contains(&i) {
+                            continue;
+                        }
+                    }
                     let mut size = core::cmp::min(v.0.len(), len - i);
                     while size != 0 {
                         if v.0[0..size] == input.bytes()[i..i + size] {
@@ -767,6 +828,9 @@ where
                             result = MutationResult::Mutated;
                             if size > 3 {
                                 masks.push(TokenMask{left: i, right: i + size});
+                            }
+                            unsafe {
+                                (*index_set).data.insert(i);
                             }
                             break 'outer;
                         }
@@ -781,6 +845,9 @@ where
                             result = MutationResult::Mutated;
                             if size > 3 {
                                 masks.push(TokenMask{left: i, right: i + size});
+                            }
+                            unsafe {
+                                (*index_set).data.insert(i);
                             }
                             break 'outer;
                         }
