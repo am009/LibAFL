@@ -78,6 +78,18 @@ pub enum MutationResult {
 /// A mutator takes input, and mutates it.
 /// Simple as that.
 pub trait Mutator<I, S>: Named {
+    /// Mutate a given input with parent testcase id
+    fn mutate2(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        stage_idx: i32,
+        _parent_id: CorpusId,
+        _old_input: &I,
+    ) -> Result<MutationResult, Error>{
+        self.mutate(state, input, stage_idx)
+    }
+
     /// Mutate a given input
     fn mutate(
         &mut self,
@@ -93,6 +105,17 @@ pub trait Mutator<I, S>: Named {
         _state: &mut S,
         _stage_idx: i32,
         _corpus_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Post-process given the outcome and the old testcase index
+    #[inline]
+    fn post_exec_diff(
+        &mut self,
+        _state: &mut S,
+        _current_id: Option<CorpusId>,
+        _parent_id: CorpusId,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -141,6 +164,16 @@ pub trait MutatorsTuple<I, S>: HasConstLen {
         corpus_idx: Option<CorpusId>,
     ) -> Result<(), Error>;
 
+    /// Runs the `post_exec` function on all `Mutators` in this `Tuple`.
+    fn post_exec_diff_all(
+        &mut self,
+        _state: &mut S,
+        _current_id: Option<CorpusId>,
+        _parent_id: CorpusId,
+    ) -> Result<(), Error> {
+        panic!("Not implemented")
+    }
+
     /// Gets the [`Mutator`] at the given index and runs the `mutate` function on it.
     fn get_and_mutate(
         &mut self,
@@ -180,6 +213,16 @@ impl<I, S> MutatorsTuple<I, S> for () {
         _state: &mut S,
         _stage_idx: i32,
         _corpus_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+
+    #[inline]
+    fn post_exec_diff_all(
+        &mut self,
+        _state: &mut S,
+        _current_id: Option<CorpusId>,
+        _parent_id: CorpusId,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -239,6 +282,16 @@ where
     ) -> Result<(), Error> {
         self.0.post_exec(state, stage_idx, corpus_idx)?;
         self.1.post_exec_all(state, stage_idx, corpus_idx)
+    }
+
+    fn post_exec_diff_all(
+        &mut self,
+        state: &mut S,
+        current_id: Option<CorpusId>,
+        parent_id: CorpusId,
+    ) -> Result<(), Error> {
+        self.0.post_exec_diff(state, current_id, parent_id)?;
+        self.1.post_exec_diff_all(state, current_id, parent_id)
     }
 
     fn get_and_mutate(

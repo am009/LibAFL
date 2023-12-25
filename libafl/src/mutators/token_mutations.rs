@@ -7,7 +7,7 @@ use core::{
     fmt::Debug,
     mem::size_of,
     ops::{Add, AddAssign},
-    slice::Iter,
+    slice::Iter, marker::PhantomData,
 };
 #[cfg(feature = "std")]
 use std::{
@@ -30,7 +30,7 @@ use crate::{
     observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
     state::{HasCorpus, HasMaxSize, HasMetadata, HasRand},
-    Error,
+    Error, corpus::{CorpusId, Corpus},
 };
 
 /// A state metadata holding a list of tokens
@@ -428,6 +428,119 @@ impl TokenReplace {
     }
 }
 
+/// a Mask of token in a input.
+#[derive(Debug, Serialize, Deserialize, SerdeAny, Clone)]
+pub struct TokenMask {
+    left: usize,
+    right: usize,
+}
+
+// /// a Mask array
+// #[derive(Debug, Serialize, Deserialize, SerdeAny)]
+// pub struct TokenMaskArray {
+//     len: usize,
+//     data: [TokenMask; 8],
+// }
+
+/// a Mask vec
+#[derive(Debug, Serialize, Deserialize, SerdeAny)]
+pub struct TokenMaskVec {
+    data: Vec<TokenMask>,
+}
+
+/// A `MaskRestoreMutator` [`Mutator`] restores the masked bytes from original input.
+/// It needs a valid [`TokenMaskVec`] in the testcase.
+#[derive(Debug, Default)]
+pub struct MaskRestoreMutator<I, MT, S>
+where
+    MT: Mutator<I, S>,
+    S: HasRand,
+{
+    inner: MT,
+    phantom: PhantomData<(I, S)>,
+}
+
+impl<I, MT, S> MaskRestoreMutator<I, MT, S>
+where
+    MT: Mutator<I, S>,
+    S: HasRand,
+{
+    /// Creates a new `MaskRestoreMutator` struct.
+    #[must_use]
+    pub fn new(inner: MT) -> Self {
+        Self {
+            inner,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<I, MT, S> Mutator<I, S> for MaskRestoreMutator<I, MT, S>
+where
+    MT: Mutator<I, S>,
+    S: HasRand + HasCorpus,
+    I: HasBytesVec,
+{
+    /// restores the masked bytes from original input
+    fn mutate2(
+        &mut self,
+        state: &mut S,
+        input: &mut I,
+        stage_idx: i32,
+        parent_id: CorpusId,
+        old_input: &I,
+    ) -> Result<MutationResult, Error>{
+        let ret = self.inner.mutate(state, input, stage_idx)?;
+
+        if state.rand_mut().next() & 0xf >= 0x1 {
+            // restore according to the masks
+            let testcase = state.corpus().get(parent_id)?.borrow();
+            let parent_metadata = testcase.metadata_map().get::<TokenMaskVec>();
+            if let Some(masks) = parent_metadata {
+                for TokenMask{left, right} in &masks.data {
+                    // input do not have enough size
+                    if *right > input.bytes().len() {
+                        continue;
+                    }
+                    unsafe {
+                        buffer_copy(input.bytes_mut(), old_input.bytes(), *left, *left, *right - *left);
+                    }
+                }
+            }
+        }
+        Ok(ret)
+    }
+
+    #[inline]
+    fn post_exec(
+        &mut self,
+        state: &mut S,
+        stage_idx: i32,
+        corpus_idx: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        self.inner.post_exec(state, stage_idx, corpus_idx)
+    }
+
+    fn mutate(
+        &mut self,
+        _state: &mut S,
+        _input: &mut I,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        panic!("MaskRestoreMutator.mutate not supported");
+    }
+}
+
+impl<I, MT, S> Named for MaskRestoreMutator<I, MT, S>
+where
+    MT: Mutator<I, S>,
+    S: HasRand,
+{
+    fn name(&self) -> &str {
+        "MaskRestoreMutator"
+    }
+}
+
 /// A `I2SRandReplace` [`Mutator`] replaces a random matching input-2-state comparison operand with the other.
 /// It needs a valid [`CmpValuesMetadata`] in the state.
 #[derive(Debug, Default)]
@@ -435,9 +548,70 @@ pub struct I2SRandReplace;
 
 impl<I, S> Mutator<I, S> for I2SRandReplace
 where
-    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize + HasCorpus,
     I: HasBytesVec,
 {
+    #[inline]
+    fn post_exec_diff(
+        &mut self,
+        state: &mut S,
+        current_id: Option<CorpusId>,
+        parent_id: CorpusId,
+    ) -> Result<(), Error> {
+        // unordered
+        if let Some(c_idx) = current_id { // input interesting
+            let testcase = state.corpus().get(parent_id)?.borrow();
+            let parent_metadata = testcase.metadata_map().get::<TokenMaskVec>();
+            let mut ret = if let Some(pm) = parent_metadata {
+                pm.data.clone()
+            } else {
+                Vec::new()
+            };
+            // check for metadata during mutation
+            // merge current from state(global_metadata) into parent metadata (ordered).
+            // 区间合并
+            let global_metadata = state.metadata_map().get::<TokenMaskVec>();
+            if let Some(gm) = global_metadata {
+                for TokenMask{mut left, mut right} in &gm.data {
+                    let mut placed = false;
+                    let mut i: usize = 0;
+                    while i < ret.len() {
+                        // 现在要插入left right, 遍历ret
+                        if ret[i].left > right {
+                            // 在当前区间左侧且无交集，插入到当前区间左侧
+                            if !placed {
+                                ret.insert(i, TokenMask{left: left, right: right});
+                                placed = true;
+                            }
+                            break;
+                        } else if ret[i].right < left {
+                            // 在当前区间右侧且无交集，继续遍历
+                            i += 1;
+                            continue;
+                        } else {
+                            // 有交集，合并区间
+                            left = left.min(ret[i].left);
+                            right = right.max(ret[i].right);
+                            // 移除当前元素
+                            ret.remove(i);
+                            // no need to i += 1;
+                        }
+                    }
+                    if !placed {
+                        ret.push(TokenMask{left: left, right: right});
+                    }
+                }
+            }
+            state.corpus().get(c_idx)?.borrow_mut().metadata_map_mut().insert::<TokenMaskVec>(TokenMaskVec{data: ret});
+        }
+        let global_metadata = state.metadata_map_mut().get_mut::<TokenMaskVec>();
+        // always clear current metadata
+        if let Some(gm) = global_metadata {
+            gm.data.clear();
+        }
+        Ok(())
+    }
+
     #[allow(clippy::too_many_lines)]
     fn mutate(
         &mut self,
@@ -466,7 +640,10 @@ where
         let len = input.bytes().len();
         let bytes = input.bytes_mut();
 
-        let meta = state.metadata_map().get::<CmpValuesMetadata>().unwrap();
+        let mm: &mut libafl_bolts::prelude::SerdeAnyMap = state.metadata_map_mut();
+        let mut masks = Vec::new();
+        let meta = mm.get::<CmpValuesMetadata>().unwrap();
+
         let cmp_values = &meta.list[idx];
 
         let mut result = MutationResult::Skipped;
@@ -522,21 +699,25 @@ where
                             let new_bytes = v.1.to_ne_bytes();
                             bytes[i..i + size_of::<u32>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
+                            masks.push(TokenMask{left: i, right: i + size_of::<u32>()});
                             break;
                         } else if val.swap_bytes() == v.0 {
                             let new_bytes = v.1.swap_bytes().to_ne_bytes();
                             bytes[i..i + size_of::<u32>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
+                            masks.push(TokenMask{left: i, right: i + size_of::<u32>()});
                             break;
                         } else if val == v.1 {
                             let new_bytes = v.0.to_ne_bytes();
                             bytes[i..i + size_of::<u32>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
+                            masks.push(TokenMask{left: i, right: i + size_of::<u32>()});
                             break;
                         } else if val.swap_bytes() == v.1 {
                             let new_bytes = v.0.swap_bytes().to_ne_bytes();
                             bytes[i..i + size_of::<u32>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
+                            masks.push(TokenMask{left: i, right: i + size_of::<u32>()});
                             break;
                         }
                     }
@@ -551,21 +732,25 @@ where
                             let new_bytes = v.1.to_ne_bytes();
                             bytes[i..i + size_of::<u64>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
+                            masks.push(TokenMask{left: i, right: i + size_of::<u64>()});
                             break;
                         } else if val.swap_bytes() == v.0 {
                             let new_bytes = v.1.swap_bytes().to_ne_bytes();
                             bytes[i..i + size_of::<u64>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
+                            masks.push(TokenMask{left: i, right: i + size_of::<u64>()});
                             break;
                         } else if val == v.1 {
                             let new_bytes = v.0.to_ne_bytes();
                             bytes[i..i + size_of::<u64>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
+                            masks.push(TokenMask{left: i, right: i + size_of::<u64>()});
                             break;
                         } else if val.swap_bytes() == v.1 {
                             let new_bytes = v.0.swap_bytes().to_ne_bytes();
                             bytes[i..i + size_of::<u64>()].copy_from_slice(&new_bytes);
                             result = MutationResult::Mutated;
+                            masks.push(TokenMask{left: i, right: i + size_of::<u64>()});
                             break;
                         }
                     }
@@ -580,6 +765,9 @@ where
                                 buffer_copy(input.bytes_mut(), &v.1, 0, i, size);
                             }
                             result = MutationResult::Mutated;
+                            if size > 3 {
+                                masks.push(TokenMask{left: i, right: i + size});
+                            }
                             break 'outer;
                         }
                         size -= 1;
@@ -591,6 +779,9 @@ where
                                 buffer_copy(input.bytes_mut(), &v.0, 0, i, size);
                             }
                             result = MutationResult::Mutated;
+                            if size > 3 {
+                                masks.push(TokenMask{left: i, right: i + size});
+                            }
                             break 'outer;
                         }
                         size -= 1;
@@ -599,6 +790,13 @@ where
             }
         }
 
+        if result == MutationResult::Mutated {
+            if let Some(val) = mm.get_mut::<TokenMaskVec>() {
+                val.data.append(&mut masks);
+            } else {
+                mm.insert(TokenMaskVec{data: masks});
+            };
+        }
         Ok(result)
     }
 }

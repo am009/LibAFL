@@ -26,15 +26,15 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
-        StdMOptMutator, StdScheduledMutator, Tokens,
+        StdMOptMutator, StdScheduledMutator, Tokens, MaskRestoreMutator,
     },
     observers::{HitcountsMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
-        TracingStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage,
+        TracingStage, mutational::I2SMutationalStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -304,7 +304,7 @@ fn fuzz(
     }
 
     // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+    let i2s = I2SMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
     // Setup a MOPT mutator
     let mutator = StdMOptMutator::new(
@@ -314,7 +314,7 @@ fn fuzz(
         5,
     )?;
 
-    let power = StdPowerMutationalStage::new(mutator);
+    let power = StdPowerMutationalStage::new(MaskRestoreMutator::new(mutator));
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(

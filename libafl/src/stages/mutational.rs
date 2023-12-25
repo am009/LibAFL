@@ -16,7 +16,7 @@ use crate::{
     stages::Stage,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasRand, UsesState},
-    Error,
+    Error, observers::CmpValuesMetadata, prelude::HasMetadata,
 };
 
 // TODO multi mutators stage
@@ -125,12 +125,14 @@ where
         };
         drop(testcase);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
+        let old_corpus_idx = corpus_idx;
+        let old_input = &input;
 
         for i in 0..num {
             let mut input = input.clone();
 
             start_timer!(state);
-            let mutated = self.mutator_mut().mutate(state, &mut input, i as i32)?;
+            let mutated = self.mutator_mut().mutate2(state, &mut input, i as i32, old_corpus_idx, old_input)?;
             mark_feature_time!(state, PerfFeature::Mutate);
 
             if mutated == MutationResult::Skipped {
@@ -143,6 +145,7 @@ where
 
             start_timer!(state);
             self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;
+            self.mutator_mut().post_exec_diff(state, corpus_idx, old_corpus_idx)?;
             post.post_exec(state, i as i32, corpus_idx)?;
             mark_feature_time!(state, PerfFeature::MutatePostExec);
         }
@@ -154,6 +157,104 @@ where
 /// Default value, how many iterations each stage gets, as an upper bound.
 /// It may randomly continue earlier.
 pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
+
+/// The I2S mutational stage: dynamically change max_iterations with the cmplog size
+#[derive(Clone, Debug)]
+pub struct I2SMutationalStage<E, EM, I, M, Z> {
+    inner: StdMutationalStage<E, EM, I, M, Z>,
+}
+
+impl<E, EM, M, Z> I2SMutationalStage<E, EM, Z::Input, M, Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<Z::Input, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+{
+    /// Creates a new default mutational stage
+    pub fn new(mutator: M) -> Self {
+        Self{inner: StdMutationalStage::new(mutator)}
+    }
+}
+
+impl<E, EM, I, M, Z> MutationalStage<E, EM, I, M, Z> for I2SMutationalStage<E, EM, I, M, Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<I, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    I: MutatedTransform<Self::Input, Self::State> + Clone,
+{
+    /// The mutator, added to this stage
+    #[inline]
+    fn mutator(&self) -> &M {
+        self.inner.mutator()
+    }
+
+    /// The list of mutators, added to this stage (as mutable ref)
+    #[inline]
+    fn mutator_mut(&mut self) -> &mut M {
+        self.inner.mutator_mut()
+    }
+
+    /// Gets the number of iterations as a random number
+    fn iterations(&self, state: &mut Z::State, _corpus_idx: CorpusId) -> Result<u64, Error> {
+        let cmps_len = if let Some(meta) = state.metadata_map().get::<CmpValuesMetadata>() {
+            meta.list.len()
+        } else {
+            0
+        };
+        let max_iter = if cmps_len <= 64 {
+            10.0 + ((cmps_len as f64) * 118.0 / 64.0).floor()
+        } else {
+            (((cmps_len as f64) + 192.0) / 128.0).log2() * 128.0
+        };
+        // let cmplog_size = state.corpus().get(corpus_idx)?.borrow().cmplog_size();
+        // Ok(1 + state.rand_mut().below(cmplog_size as u64))
+        Ok(1 + state.rand_mut().below(max_iter as u64))
+    }
+}
+
+impl<E, EM, I, M, Z> UsesState for I2SMutationalStage<E, EM, I, M, Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<I, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+{
+    type State = Z::State;
+}
+
+impl<E, EM, I, M, Z> Stage<E, EM, Z> for I2SMutationalStage<E, EM, I, M, Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<I, Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    I: MutatedTransform<Self::Input, Self::State> + Clone,
+{
+    #[inline]
+    #[allow(clippy::let_and_return)]
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Z::State,
+        manager: &mut EM,
+        corpus_idx: CorpusId,
+    ) -> Result<(), Error> {
+        let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
+
+        #[cfg(feature = "introspection")]
+        state.introspection_monitor_mut().finish_stage();
+
+        ret
+    }
+}
 
 /// The default mutational stage
 #[derive(Clone, Debug)]

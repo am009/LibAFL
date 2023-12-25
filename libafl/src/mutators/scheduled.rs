@@ -165,6 +165,16 @@ where
     ) -> Result<MutationResult, Error> {
         self.scheduled_mutate(state, input, stage_idx)
     }
+
+    #[inline]
+    fn post_exec_diff(
+        &mut self,
+        state: &mut S,
+        current_id: Option<CorpusId>,
+        parent_id: CorpusId,
+    ) -> Result<(), Error> {
+        self.mutations_mut().post_exec_diff_all(state, current_id, parent_id)
+    }
 }
 
 impl<I, MT, S> ComposedByMutations<I, MT, S> for StdScheduledMutator<I, MT, S>
