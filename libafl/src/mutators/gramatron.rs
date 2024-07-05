@@ -20,6 +20,9 @@ use crate::{
     Error, HasMetadata,
 };
 
+#[cfg(feature = "introspection")]
+use crate::monitors::{add_mutator_name};
+
 const RECUR_THRESHOLD: usize = 5;
 
 /// A random mutator for grammar fuzzing
@@ -40,6 +43,8 @@ where
         state: &mut S,
         input: &mut GramatronInput,
     ) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("GramatronRandomMutator\x00".as_ptr() as *const i8); };
         if !input.terminals().is_empty() {
             let size = state.rand_mut().below(input.terminals().len() + 1);
             input.terminals_mut().truncate(size);
@@ -113,6 +118,8 @@ where
         state: &mut S,
         input: &mut GramatronInput,
     ) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("GramatronSpliceMutator\x00".as_ptr() as *const i8); };
         if input.terminals().is_empty() {
             return Ok(MutationResult::Skipped);
         }
@@ -188,6 +195,8 @@ where
         state: &mut S,
         input: &mut GramatronInput,
     ) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("GramatronRecursionMutator\x00".as_ptr() as *const i8); };
         if input.terminals().is_empty() {
             return Ok(MutationResult::Skipped);
         }

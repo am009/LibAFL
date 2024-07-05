@@ -22,6 +22,9 @@ use crate::{
     Error, HasMetadata,
 };
 
+#[cfg(feature = "introspection")]
+use crate::monitors::{add_mutator_name};
+
 /// The randomic mutator for `Nautilus` grammar.
 pub struct NautilusRandomMutator<'a> {
     ctx: &'a Context,
@@ -40,6 +43,8 @@ impl<S: HasRand> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
         state: &mut S,
         input: &mut NautilusInput,
     ) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("NautilusRandomMutator\x00".as_ptr() as *const i8); };
         // TODO get rid of tmp
         let mut tmp = vec![];
         self.mutator
@@ -102,6 +107,8 @@ impl<S: HasRand> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
         state: &mut S,
         input: &mut NautilusInput,
     ) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("NautilusRecursionMutator\x00".as_ptr() as *const i8); };
         // TODO don't calc recursions here
         if let Some(ref mut recursions) = input.tree.calc_recursions(self.ctx) {
             // TODO get rid of tmp
@@ -169,6 +176,9 @@ where
         state: &mut S,
         input: &mut NautilusInput,
     ) -> Result<MutationResult, Error> {
+        // TODO? what splice
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("NautilusSpliceMutator\x00".as_ptr() as *const i8); };
         // TODO get rid of tmp
         let mut tmp = vec![];
         // Create a fast temp mutator to get around borrowing..

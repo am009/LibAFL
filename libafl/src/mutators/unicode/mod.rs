@@ -21,6 +21,9 @@ use crate::{
     HasMetadata,
 };
 
+#[cfg(feature = "introspection")]
+use crate::monitors::{add_mutator_name};
+
 /// Unicode category data, as used by string analysis and mutators.
 #[allow(unused)]
 #[allow(missing_docs)]
@@ -283,6 +286,8 @@ where
     S: HasRand + HasMaxSize,
 {
     fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("UnicodeCategoryRandMutator\x00".as_ptr() as *const i8); };
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
@@ -342,6 +347,8 @@ where
     S: HasRand + HasMaxSize,
 {
     fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("UnicodeSubcategoryRandMutator\x00".as_ptr() as *const i8); };
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
@@ -389,6 +396,8 @@ where
     S: HasRand + HasMaxSize + HasMetadata,
 {
     fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("UnicodeCategoryTokenReplaceMutator\x00".as_ptr() as *const i8); };
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
@@ -449,6 +458,8 @@ where
     S: HasRand + HasMaxSize + HasMetadata,
 {
     fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("UnicodeSubcategoryTokenReplaceMutator\x00".as_ptr() as *const i8); };
         if input.0.bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }

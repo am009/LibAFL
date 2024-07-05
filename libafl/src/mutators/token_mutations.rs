@@ -34,6 +34,9 @@ use crate::{
     Error, HasMetadata,
 };
 
+#[cfg(feature = "introspection")]
+use crate::monitors::{add_mutator_name};
+
 /// A state metadata holding a list of tokens
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -308,6 +311,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("TokenInsert\x00".as_ptr() as *const i8); };
         let max_size = state.max_size();
         let tokens_len = {
             let Some(meta) = state.metadata_map().get::<Tokens>() else {
@@ -371,6 +376,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("TokenReplace\x00".as_ptr() as *const i8); };
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -431,6 +438,9 @@ where
 {
     #[allow(clippy::too_many_lines)]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("I2SRandReplace\x00".as_ptr() as *const i8); };
+
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -1098,6 +1108,8 @@ where
         input: &I,
         max_count: Option<usize>,
     ) -> Result<Vec<I>, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("AFLppRedQueen\x00".as_ptr() as *const i8); };
         // TODO
         // handle 128-bits logs
         let size = input.bytes().len();

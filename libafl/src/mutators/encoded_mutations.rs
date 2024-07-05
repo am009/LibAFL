@@ -20,12 +20,17 @@ use crate::{
     Error,
 };
 
+#[cfg(feature = "introspection")]
+use crate::monitors::{add_mutator_name};
+
 /// Set a code in the input as a random value
 #[derive(Debug, Default)]
 pub struct EncodedRandMutator;
 
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedRandMutator {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("EncodedRandMutator\x00".as_ptr() as *const i8); };
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -57,6 +62,8 @@ pub struct EncodedIncMutator;
 
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedIncMutator {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("EncodedIncMutator\x00".as_ptr() as *const i8); };
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -88,6 +95,8 @@ pub struct EncodedDecMutator;
 
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDecMutator {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("EncodedDecMutator\x00".as_ptr() as *const i8); };
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -119,6 +128,8 @@ pub struct EncodedAddMutator;
 
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("EncodedAddMutator\x00".as_ptr() as *const i8); };
         if input.codes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -154,6 +165,8 @@ pub struct EncodedDeleteMutator;
 
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDeleteMutator {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("EncodedDeleteMutator\x00".as_ptr() as *const i8); };
         let size = input.codes().len();
         if size <= 2 {
             return Ok(MutationResult::Skipped);
@@ -193,6 +206,8 @@ where
     S: HasRand + HasMaxSize,
 {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("EncodedInsertCopyMutator\x00".as_ptr() as *const i8); };
         let max_size = state.max_size();
         let size = input.codes().len();
         if size == 0 {
@@ -249,6 +264,8 @@ pub struct EncodedCopyMutator;
 
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("EncodedCopyMutator\x00".as_ptr() as *const i8); };
         let size = input.codes().len();
         if size <= 1 {
             return Ok(MutationResult::Skipped);
@@ -290,6 +307,8 @@ where
     S: UsesInput<Input = EncodedInput> + HasRand + HasCorpus + HasMaxSize,
 {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("EncodedCrossoverInsertMutator\x00".as_ptr() as *const i8); };
         let size = input.codes().len();
 
         // We don't want to use the testcase we're already using for splicing
@@ -360,6 +379,8 @@ where
     S: UsesInput<Input = EncodedInput> + HasRand + HasCorpus,
 {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("EncodedCrossoverReplaceMutator\x00".as_ptr() as *const i8); };
         let size = input.codes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);

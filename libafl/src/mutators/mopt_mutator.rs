@@ -19,6 +19,9 @@ use crate::{
     Error, HasMetadata,
 };
 
+#[cfg(feature = "introspection")]
+use crate::monitors::{add_mutator_name};
+
 /// A Struct for managing MOpt-mutator parameters.
 /// There are 2 modes for `MOpt` scheduler, the core fuzzing mode and the pilot fuzzing mode.
 /// In short, in the pilot fuzzing mode, the fuzzer employs several `swarms` to compute the probability to choose the mutation operator.
@@ -394,6 +397,8 @@ where
 {
     #[inline]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("StdMOptMutator\x00".as_ptr() as *const i8); };
         self.finds_before = state.corpus().count() + state.solutions().count();
         self.scheduled_mutate(state, input)
     }

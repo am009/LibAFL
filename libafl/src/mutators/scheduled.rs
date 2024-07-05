@@ -33,6 +33,9 @@ use crate::{
     Error, HasMetadata,
 };
 
+#[cfg(feature = "introspection")]
+use crate::monitors::{add_mutator_name};
+
 /// The metadata placed in a [`crate::corpus::Testcase`] by a [`LoggerScheduledMutator`].
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(
@@ -150,6 +153,8 @@ where
 {
     #[inline]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("StdScheduledMutator\x00".as_ptr() as *const i8); };
         self.scheduled_mutate(state, input)
     }
 }
@@ -385,6 +390,8 @@ where
     SM: ScheduledMutator<I, MT, S>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("LoggerScheduledMutator\x00".as_ptr() as *const i8); };
         self.scheduled_mutate(state, input)
     }
 

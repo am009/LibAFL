@@ -22,6 +22,9 @@ use crate::{
     Error, HasMetadata,
 };
 
+#[cfg(feature = "introspection")]
+use crate::monitors::{add_mutator_name};
+
 /// Metadata in the state, that controls the behavior of the [`TuneableScheduledMutator`] at runtime
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(
@@ -113,6 +116,8 @@ where
 {
     #[inline]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("TuneableScheduledMutator\x00".as_ptr() as *const i8); };
         self.scheduled_mutate(state, input)
     }
 }

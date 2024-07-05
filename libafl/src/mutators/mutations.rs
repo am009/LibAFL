@@ -17,6 +17,9 @@ use crate::{
     Error,
 };
 
+#[cfg(feature = "introspection")]
+use crate::monitors::{add_mutator_name, set_splice_seed_name};
+
 /// Mem move in the own vec
 #[inline]
 pub(crate) unsafe fn buffer_self_copy<T>(data: &mut [T], from: usize, to: usize, len: usize) {
@@ -126,6 +129,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("BitFlipMutator\x00".as_ptr() as *const i8); };
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -162,6 +167,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("ByteFlipMutator\x00".as_ptr() as *const i8); };
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -196,6 +203,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("ByteIncMutator\x00".as_ptr() as *const i8); };
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -231,6 +240,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("ByteDecMutator\x00".as_ptr() as *const i8); };
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -266,6 +277,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("ByteNegMutator\x00".as_ptr() as *const i8); };
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -301,6 +314,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("ByteRandMutator\x00".as_ptr() as *const i8); };
         if input.bytes().is_empty() {
             Ok(MutationResult::Skipped)
         } else {
@@ -346,6 +361,8 @@ macro_rules! add_mutator_impl {
                 input: &mut I,
 
             ) -> Result<MutationResult, Error> {
+                #[cfg(feature = "introspection")]
+                unsafe { add_mutator_name("$name\x00".as_ptr() as *const i8); };
                 if input.bytes().len() < size_of::<$size>() {
                     Ok(MutationResult::Skipped)
                 } else {
@@ -409,6 +426,8 @@ macro_rules! interesting_mutator_impl {
         {
             #[allow(clippy::cast_sign_loss)]
             fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+                #[cfg(feature = "introspection")]
+                unsafe { add_mutator_name("$name\x00".as_ptr() as *const i8); };
                 if input.bytes().len() < size_of::<$size>() {
                     Ok(MutationResult::Skipped)
                 } else {
@@ -457,6 +476,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("BytesDeleteMutator\x00".as_ptr() as *const i8); };
         let size = input.bytes().len();
         if size <= 2 {
             return Ok(MutationResult::Skipped);
@@ -495,6 +516,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("BytesExpandMutator\x00".as_ptr() as *const i8); };
         let max_size = state.max_size();
         let size = input.bytes().len();
         if size == 0 || size >= max_size {
@@ -542,6 +565,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("BytesInsertMutator\x00".as_ptr() as *const i8); };
         let max_size = state.max_size();
         let size = input.bytes().len();
         if size == 0 || size >= max_size {
@@ -596,6 +621,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("BytesRandInsertMutator\x00".as_ptr() as *const i8); };
         let max_size = state.max_size();
         let size = input.bytes().len();
         if size >= max_size {
@@ -650,6 +677,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("BytesSetMutator\x00".as_ptr() as *const i8); };
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -689,6 +718,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("BytesRandSetMutator\x00".as_ptr() as *const i8); };
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -728,6 +759,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("BytesCopyMutator\x00".as_ptr() as *const i8); };
         let size = input.bytes().len();
         if size <= 1 {
             return Ok(MutationResult::Skipped);
@@ -771,6 +804,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("BytesInsertCopyMutator\x00".as_ptr() as *const i8); };
         let size = input.bytes().len();
         if size <= 1 || size >= state.max_size() {
             return Ok(MutationResult::Skipped);
@@ -832,6 +867,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("BytesSwapMutator\x00".as_ptr() as *const i8); };
         let size = input.bytes().len();
         if size <= 1 {
             return Ok(MutationResult::Skipped);
@@ -1067,6 +1104,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("CrossoverInsertMutator\x00".as_ptr() as *const i8); };
         let size = input.bytes().len();
         let max_size = state.max_size();
         if size >= max_size {
@@ -1152,6 +1191,8 @@ where
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("CrossoverReplaceMutator\x00".as_ptr() as *const i8); };
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -1230,6 +1271,8 @@ where
 {
     #[allow(clippy::cast_sign_loss)]
     fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("SpliceMutator\x00".as_ptr() as *const i8); };
         // We don't want to use the testcase we're already using for splicing
         let idx = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
@@ -1240,6 +1283,12 @@ where
 
         let (first_diff, last_diff) = {
             let mut other_testcase = state.corpus().get_from_all(idx)?.borrow_mut();
+            #[cfg(feature = "introspection")]
+            unsafe {
+                let cstr = std::ffi::CString::new(other_testcase.filename().clone().unwrap()).unwrap();
+                set_splice_seed_name(cstr.as_ptr());
+            }
+            
             let other = other_testcase.load_input(state.corpus())?;
 
             let (f, l) = locate_diffs(input.bytes(), other.bytes());

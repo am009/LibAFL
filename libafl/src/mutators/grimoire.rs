@@ -18,6 +18,9 @@ use crate::{
     Error, HasMetadata,
 };
 
+#[cfg(feature = "introspection")]
+use crate::monitors::{add_mutator_name};
+
 const RECURSIVE_REPLACEMENT_DEPTH: [usize; 6] = [2, 4, 8, 16, 32, 64];
 const MAX_RECURSIVE_REPLACEMENT_LEN: usize = 64 << 10;
 const CHOOSE_SUBINPUT_PROB: f64 = 0.5;
@@ -126,6 +129,8 @@ where
         state: &mut S,
         generalised_meta: &mut GeneralizedInputMetadata,
     ) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("GrimoireExtensionMutator\x00".as_ptr() as *const i8); };
         extend_with_random_generalized(
             state,
             generalised_meta.generalized_mut(),
@@ -167,6 +172,8 @@ where
         state: &mut S,
         generalised_meta: &mut GeneralizedInputMetadata,
     ) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("GrimoireRecursiveReplacementMutator\x00".as_ptr() as *const i8); };
         let mut mutated = MutationResult::Skipped;
 
         let depth = *state
@@ -243,6 +250,8 @@ where
         state: &mut S,
         generalised_meta: &mut GeneralizedInputMetadata,
     ) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("GrimoireStringReplacementMutator\x00".as_ptr() as *const i8); };
         let tokens_len = {
             let meta = state.metadata_map().get::<Tokens>();
             if let Some(tokens) = meta {
@@ -354,6 +363,8 @@ where
         state: &mut S,
         generalised_meta: &mut GeneralizedInputMetadata,
     ) -> Result<MutationResult, Error> {
+        #[cfg(feature = "introspection")]
+        unsafe { add_mutator_name("GrimoireRandomDeleteMutator\x00".as_ptr() as *const i8); };
         let gen = generalised_meta.generalized_mut();
 
         for i in gen
