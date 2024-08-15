@@ -18,7 +18,7 @@ use crate::{
     Error, Evaluator, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]
-use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
+use crate::{monitors::{PerfFeature, set_current_seed_name, changed_seed, log_previous_chances, reset_chances, increase_chances}, state::HasClientPerfMonitor};
 
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
@@ -184,6 +184,18 @@ where
         let Ok(input) = I::try_transform_from(&mut testcase, state) else {
             return Ok(());
         };
+
+        #[cfg(feature = "introspection")]
+        unsafe {
+            // set_current_seed_name(testcase.filename().cloned().unwrap().as_ptr());
+            let cstr = std::ffi::CString::new(testcase.filename().clone().unwrap()).unwrap();
+            set_current_seed_name(cstr.as_ptr());
+            if changed_seed() != 0 {
+                log_previous_chances();
+                reset_chances();
+            }
+        };
+
         drop(testcase);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
@@ -196,6 +208,8 @@ where
                         break;
                     }
 
+                    #[cfg(feature = "introspection")]
+                    unsafe { increase_chances(); };
                     self.perform_mutation(fuzzer, executor, state, manager, &input)?;
                 }
             }
@@ -207,12 +221,16 @@ where
                         break;
                     }
 
+                    #[cfg(feature = "introspection")]
+                    unsafe { increase_chances(); };
                     self.perform_mutation(fuzzer, executor, state, manager, &input)?;
                 }
             }
             (None, Some(iters)) => {
                 // perform n iterations
                 for _ in 1..=iters {
+                    #[cfg(feature = "introspection")]
+                    unsafe { increase_chances(); };
                     self.perform_mutation(fuzzer, executor, state, manager, &input)?;
                 }
             }
@@ -222,6 +240,8 @@ where
                     .iterations(state)?
                     .saturating_sub(self.execs_since_progress_start(state)? as usize);
                 for _ in 1..=iters {
+                    #[cfg(feature = "introspection")]
+                    unsafe { increase_chances(); };
                     self.perform_mutation(fuzzer, executor, state, manager, &input)?;
                 }
             }

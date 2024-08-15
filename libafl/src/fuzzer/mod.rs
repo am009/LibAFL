@@ -24,7 +24,7 @@ use crate::{
     Error, HasMetadata,
 };
 #[cfg(feature = "introspection")]
-use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
+use crate::{monitors::PerfFeature, state::HasClientPerfMonitor, monitors::add_kept_reason};
 
 /// Send a monitor update all 15 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
@@ -456,6 +456,9 @@ where
                     .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
                 self.feedback_mut()
                     .append_metadata(state, manager, observers, &mut testcase)?;
+                unsafe {
+                    add_kept_reason("feedback\x00".as_ptr() as *const i8);
+                };
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
 
@@ -501,6 +504,9 @@ where
                     .append_hit_feedbacks(testcase.hit_objectives_mut())?;
                 self.objective_mut()
                     .append_metadata(state, manager, observers, &mut testcase)?;
+                unsafe {
+                    add_kept_reason("feedback\x00".as_ptr() as *const i8);
+                };
                 state.solutions_mut().add(testcase)?;
 
                 if send_events {

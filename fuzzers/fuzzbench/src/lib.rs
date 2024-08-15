@@ -16,14 +16,17 @@ use std::{
 
 use clap::{Arg, Command};
 use libafl::{
-    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus, Testcase},
     events::SimpleRestartingEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    monitors::SimpleMonitor,
+    monitors::{
+        add_mutator_name, changed_seed, fuzzer_logger_end, fuzzer_logger_start, log_chances,
+        log_previous_chances, reset_chances, set_current_seed_name, SimpleMonitor,
+    },
     mutators::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
@@ -55,9 +58,21 @@ use libafl_targets::{
 #[cfg(unix)]
 use nix::unistd::dup;
 
+// Create a wrapper for correct type.
+extern "C" fn run_at_end() {
+    println!("Closing fuzzer log!");
+    unsafe {
+        fuzzer_logger_end();
+    }
+}
+
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
 pub extern "C" fn libafl_main() {
+    unsafe {
+        fuzzer_logger_start();
+        nix::libc::atexit(run_at_end);
+    };
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     // unsafe { RegistryBuilder::register::<Tokens>(); }

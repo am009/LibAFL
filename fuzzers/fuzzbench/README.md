@@ -1,5 +1,10 @@
 # Fuzzbench Harness
 
+```
+export FUZZERLOGLIB=/sn640/fuzzerlog/fuzzer-log-lib/libfuzzerlog.so
+cargo make
+```
+
 This folder contains an example fuzzer tailored for fuzzbench.
 It uses the best possible setting, with the exception of a SimpleRestartingEventManager instead of an LlmpEventManager - since fuzzbench is single threaded.
 Real fuzz campaigns should consider using multithreaded LlmpEventManager, see the other examples.

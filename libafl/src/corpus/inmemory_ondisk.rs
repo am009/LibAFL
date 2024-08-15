@@ -21,9 +21,7 @@ use super::{
     HasTestcase,
 };
 use crate::{
-    corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
-    inputs::{Input, UsesInput},
-    Error, HasMetadata,
+    corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase}, inputs::{Input, UsesInput}, prelude::log_new_seed_multi_reason, Error, HasMetadata
 };
 
 /// A corpus able to store [`Testcase`]s to disk, while also keeping all of them in memory.
@@ -401,6 +399,13 @@ where
             }
         } else {
             file_name
+        };
+
+        #[cfg(feature = "introspection")]
+        unsafe {
+            // set_current_seed_name(testcase.filename().cloned().unwrap().as_ptr());
+            let cstr = std::ffi::CString::new(file_name.clone()).unwrap();
+            log_new_seed_multi_reason(cstr.as_ptr());
         };
 
         if testcase

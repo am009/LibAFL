@@ -18,7 +18,7 @@ use crate::{
     Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "introspection")]
-use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
+use crate::{monitors::{PerfFeature, set_current_seed_name, changed_seed, log_previous_chances, reset_chances, set_splice_seed_name, reset_kept_reasons, reset_mutator_names, increase_chances}, state::HasClientPerfMonitor};
 
 // TODO multi mutators stage
 
@@ -120,6 +120,22 @@ where
         let Ok(input) = I::try_transform_from(&mut testcase, state) else {
             return Ok(());
         };
+
+        #[cfg(feature = "introspection")]
+        unsafe {
+            // set_current_seed_name(testcase.filename().cloned().unwrap().as_ptr());
+            let cstr = std::ffi::CString::new(testcase.filename().clone().unwrap()).unwrap();
+            let empty = std::ffi::CString::new("").unwrap();
+            set_splice_seed_name(empty.as_ptr());
+            set_current_seed_name(cstr.as_ptr());
+            if changed_seed() != 0 {
+                log_previous_chances();
+                reset_chances();
+                reset_kept_reasons();
+                reset_mutator_names();
+            }
+        };
+
         drop(testcase);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
@@ -137,6 +153,8 @@ where
             // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = input.try_transform_into(state)?;
             let (_, corpus_idx) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+            #[cfg(feature = "introspection")]
+            unsafe { increase_chances(); };
 
             start_timer!(state);
             self.mutator_mut().post_exec(state, corpus_idx)?;

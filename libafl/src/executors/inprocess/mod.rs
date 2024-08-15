@@ -36,6 +36,9 @@ use crate::{
     Error, HasMetadata,
 };
 
+#[cfg(feature = "introspection")]
+use crate::monitors::add_kept_reason;
+
 /// The inner structure of `InProcessExecutor`.
 pub mod inner;
 /// A version of `InProcessExecutor` with a state accessible from the harness.
@@ -465,6 +468,10 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
             .objective_mut()
             .append_metadata(state, event_mgr, &*observers, &mut new_testcase)
             .expect("Failed adding metadata");
+        #[cfg(feature = "introspection")]
+        unsafe {
+            add_kept_reason("objective\x00".as_ptr() as *const i8);
+        };
         state
             .solutions_mut()
             .add(new_testcase)

@@ -1004,6 +1004,34 @@ impl From<usize> for PerfFeature {
     }
 }
 
+#[cfg(feature = "introspection")]
+extern "C" {
+    pub fn reset_chances();
+    pub fn increase_chances();
+    pub fn reset_mutator_names();
+    pub fn reset_kept_reasons();
+    pub fn add_mutator_name(mutator_name: *const ::std::os::raw::c_char);
+    pub fn add_kept_reason(kept_reason: *const ::std::os::raw::c_char);
+    pub fn get_mutated() -> ::std::os::raw::c_int;
+    pub fn log_new_seed_multi_reason(
+        seed_name: *const ::std::os::raw::c_char,
+    );
+    pub fn log_new_seed(
+        seed_name: *const ::std::os::raw::c_char,
+        kept_reason: *const ::std::os::raw::c_char,
+    );
+    pub fn reset_current_seed_name();
+    pub fn set_current_seed_name(seed_name: *const ::std::os::raw::c_char);
+    pub fn changed_seed() -> ::std::os::raw::c_int;
+    pub fn set_splice_seed_name(seed_name: *const ::std::os::raw::c_char);
+    pub fn log_chances();
+    pub fn log_previous_chances();
+    pub fn fuzzer_logger_start();
+    pub fn fuzzer_logger_end();
+    pub fn _init_log_file_fs();
+    pub fn _close_log_file_fs();
+}
+
 /// Number of features we can measure for performance
 #[cfg(feature = "introspection")]
 pub const NUM_PERF_FEATURES: usize = PerfFeature::Count as usize;

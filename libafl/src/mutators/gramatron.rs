@@ -21,7 +21,7 @@ use crate::{
 };
 
 #[cfg(feature = "introspection")]
-use crate::monitors::{add_mutator_name};
+use crate::monitors::{add_mutator_name, set_splice_seed_name};
 
 const RECUR_THRESHOLD: usize = 5;
 
@@ -131,6 +131,13 @@ where
         let rand_num = state.rand_mut().next();
 
         let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+
+        // fuzzerloglib: splice
+        #[cfg(feature = "introspection")]
+        unsafe {
+            let cstr = std::ffi::CString::new(other_testcase.filename().clone().unwrap()).unwrap();
+            set_splice_seed_name(cstr.as_ptr());
+        };
 
         if !other_testcase.has_metadata::<GramatronIdxMapMetadata>() {
             let meta = GramatronIdxMapMetadata::new(other_testcase.load_input(state.corpus())?);
